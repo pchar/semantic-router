@@ -578,9 +578,7 @@ func startExtProcServer(
 	writer startupstatus.StatusWriter,
 ) error {
 	if err := server.StartContextWithReady(ctx, func() {
-		if server.CurrentConfig().ConfigSource != config.ConfigSourceKubernetes {
-			markRouterReady(writer, startupEmbeddingProviderStatus(server.EmbeddingRuntimeState()))
-		}
+		markRouterReady(writer, startupEmbeddingProviderStatus(server.EmbeddingRuntimeState()))
 	}); err != nil {
 		return recordStartupError(writer, "serve ExtProc", err)
 	}

@@ -58,9 +58,7 @@ func startNativeGateway(ctx context.Context, server *extproc.Server, writer star
 	go func() {
 		served <- server.StartContextWithoutExtProc(ctx, func() {
 			ready.Store(true)
-			if cfg.ConfigSource != config.ConfigSourceKubernetes {
-				markRouterReady(writer, startupEmbeddingProviderStatus(server.EmbeddingRuntimeState()))
-			}
+			markRouterReady(writer, startupEmbeddingProviderStatus(server.EmbeddingRuntimeState()))
 		})
 	}()
 	select {
