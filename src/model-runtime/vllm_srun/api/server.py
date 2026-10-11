@@ -48,7 +48,7 @@ def serve(config: ServeConfig) -> None:
 
     options: dict[str, Any] = {
         "log_level": config.log_level,
-        "access_log": False,
+        "access_log": True,
         "timeout_keep_alive": 30,
         "lifespan": "off",
     }
