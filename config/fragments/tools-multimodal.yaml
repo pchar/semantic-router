@@ -1,0 +1,126 @@
+# Multimodal Tool Definitions for vLLM-SR
+# Fragments appended to the router config's `tools:` section.
+# Copy this into semantic-router/config/fragments/tools-multimodal.yaml
+
+tools:
+  - name: audio_stt
+    description: >
+      Transcribe audio to text. Accepts an audio URL. Returns the transcription
+      text with optional word-level timestamps. If diarize=true and a WhisperX
+      endpoint is available, also returns speaker labels per segment.
+    parameters:
+      type: object
+      properties:
+        audio_url:
+          type: string
+          description: "URL of audio file (mp3, wav, m4a, webm, ogg, flac, mp4)"
+        language:
+          type: string
+          description: "Optional ISO 639-1 language code. Omit for auto-detect."
+        diarize:
+          type: boolean
+          description: "Enable speaker diarization (requires GPU/WhisperX backend)."
+      required: [audio_url]
+    endpoints:
+      - url: "http://voicebox.nxt.svc.cluster.local:8790/v1/audio/transcriptions"
+        method: POST
+
+  - name: audio_speech
+    description: >
+      Generate speech from text. Returns WAV audio. The LLM stores the result
+      as a file and returns its URL.
+    parameters:
+      type: object
+      properties:
+        text:
+          type: string
+          description: "Text to synthesize into speech"
+        voice:
+          type: string
+          description: "Voice ID. Default: en_US-amy-medium."
+        speed:
+          type: number
+          default: 1.0
+          minimum: 0.25
+          maximum: 4.0
+          description: "Speech speed multiplier"
+        response_format:
+          type: string
+          default: wav
+          enum: [wav, pcm, mp3]
+          description: "Output audio format"
+      required: [text]
+    endpoints:
+      - url: "http://voicebox.nxt.svc.cluster.local:8790/v1/audio/speech"
+        method: POST
+
+  - name: video_analyze
+    description: >
+      Analyze a video file. Extracts keyframes using scene-change detection,
+      sends frames to a vision model (Orcus), and returns a structured JSON
+      summary with key events, objects, and visible text.
+    parameters:
+      type: object
+      properties:
+        video_url:
+          type: string
+          description: "URL of video file on cluster storage"
+        max_frames:
+          type: integer
+          default: 10
+          description: "Maximum number of keyframes to extract and analyze"
+      required: [video_url]
+    endpoints:
+      - url: "http://video-analyzer.nxt.svc.cluster.local:8010/v1/chat/completions"
+        method: POST
+
+  - name: doc_layout_extract
+    description: >
+      Extract structured content from a PDF or document image. Returns text,
+      tables (with rows and columns), and inline images with bbox coordinates.
+      Uses MinerU for layout analysis (CPU service on Thor).
+    parameters:
+      type: object
+      properties:
+        file_url:
+          type: string
+          description: "URL of the PDF or document file on cluster storage"
+        max_pages:
+          type: integer
+          default: 100
+          description: "Maximum pages to process"
+      required: [file_url]
+    endpoints:
+      - url: "http://mineru.nxt.svc.cluster.local:8020/v1/chat/completions"
+        method: POST
+
+# Signal definitions for routing decisions
+signals:
+  - name: has_audio_transcribe
+    type: keyword
+    keywords: ["transcribe", "audio to text", "speech to text", "whisper", "stt"]
+  - name: has_audio_speak
+    type: keyword
+    keywords: ["text to speech", "synthesize", "read aloud", "tts", "sound", "voice"]
+  - name: has_video_input
+    type: keyword
+    keywords: ["analyze video", "video summary", "video analysis", "keyframe", "what's happening in this video"]
+  - name: has_doc_input
+    type: keyword
+    keywords: ["extract from document", "parse pdf", "document layout", "read pdf", "pdf to text", "extract table from"]
+
+decisions:
+  - name: audio-service-routing
+    expression: "has_audio_transcribe OR has_audio_speak"
+    algorithm: static
+    target_model: qwen3-8b
+
+  - name: video-analysis-routing
+    expression: "has_video_input"
+    algorithm: static
+    target_model: qwen3-8b
+
+  - name: document-layout-routing
+    expression: "has_doc_input"
+    algorithm: static
+    target_model: qwen3-8b
