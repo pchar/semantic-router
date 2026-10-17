@@ -19,6 +19,12 @@ const (
 	piiSignalChunkOverlapRunes  = 64
 	jailbreakSignalChunkBudget  = 384 * 4
 	jailbreakSignalOverlapRunes = 64
+	// decisionSignalUnitLimit bounds the state of one decision-model call.
+	// Decision models read every question over the state, so their latency
+	// grows with it: d3-flash on a Jetson Thor takes ~0.38 ms per input token
+	// and an unbounded agent prompt (5K-20K tokens) overruns any routing
+	// timeout, leaving every decision signal unknown.
+	decisionSignalUnitLimit = 256 * 4
 )
 
 const signalWindowOmissionMarker = "\n... [content sampled for routing signal evaluation] ...\n"
@@ -38,6 +44,9 @@ var boundedSemanticSignalTypes = map[string]struct{}{
 }
 
 func textForRoutingSignal(signalType, text string) string {
+	if signalType == config.SignalTypeDecision {
+		return representativeSignalText(text, decisionSignalUnitLimit)
+	}
 	if _, bounded := boundedSemanticSignalTypes[signalType]; !bounded {
 		return text
 	}
