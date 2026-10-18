@@ -455,10 +455,10 @@ func assembleChatMessage(
 	return message, nil
 }
 
+// messages[].name is an optional OpenAI participant label (and legacy tool
+// results carry it). vLLM accepts it and chat templates ignore it, so it is
+// accepted here and dropped rather than rejected.
 func validateChatMessageEnvelope(wire chatMessageWire) (llmprotocol.Role, error) {
-	if err := rejectUnsupportedRequestField("messages.name", wire.Name); err != nil {
-		return "", err
-	}
 	if wire.Audio != nil {
 		return "", llmprotocol.NewError(
 			llmprotocol.ErrorUnsupportedFeature, "unsupported_output_audio", "Chat output audio is unsupported", nil,
