@@ -99,6 +99,11 @@ func validateRouterLearningProtectionConfig(cfg RouterLearningProtectionConfig) 
 	if cfg.Identity.Headers.Conversation != nil && strings.TrimSpace(*cfg.Identity.Headers.Conversation) == "" {
 		return fmt.Errorf("global.router.learning.protection.identity.headers.conversation cannot be empty")
 	}
+	switch cfg.Identity.Fallback {
+	case "", RouterLearningIdentityFallbackConversationStart:
+	default:
+		return fmt.Errorf("global.router.learning.protection.identity.fallback must be %q when set", RouterLearningIdentityFallbackConversationStart)
+	}
 
 	return validateProtectionTuning(
 		"global.router.learning.protection.tuning",

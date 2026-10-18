@@ -2122,6 +2122,9 @@ global:
           headers:
             session: x-session-id
             conversation: x-conversation-id
+          # Derive the session from the first system + user message when the
+          # client sends no session header.
+          fallback: conversation_start
         tuning:
           idle_timeout_seconds: 300
           min_turns_before_switch: 1
