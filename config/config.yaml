@@ -2122,7 +2122,7 @@ global:
           headers:
             session: x-session-id
             conversation: x-conversation-id
-          # Derive the session from the first system + user message when the
+          # Derive the session from the first user message when the
           # client sends no session header.
           fallback: conversation_start
         tuning:

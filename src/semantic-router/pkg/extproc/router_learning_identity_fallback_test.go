@@ -39,9 +39,11 @@ func TestProtectionIdentityFallsBackToConversationStart(t *testing.T) {
 	if other.sessionID == first.sessionID {
 		t.Fatalf("a different conversation must get a different session")
 	}
-	otherSystem, _ := r.protectionIdentity(fallbackTestRequest("You are a reviewer.", "Write a merge function"), cfg)
-	if otherSystem.sessionID == first.sessionID {
-		t.Fatalf("a different system prompt must get a different session")
+	// A decision's system_prompt plugin rewrites the instructions before
+	// protection runs; the session must not change with them.
+	rewritten, _ := r.protectionIdentity(fallbackTestRequest("Decision prompt for code.", "Write a merge function", "def merge(a, b): ...", "Add tests."), cfg)
+	if rewritten.sessionID != first.sessionID {
+		t.Fatalf("rewritten system instructions must keep the session: %q vs %q", rewritten.sessionID, first.sessionID)
 	}
 }
 

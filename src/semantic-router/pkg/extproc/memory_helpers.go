@@ -84,33 +84,28 @@ const sessionMessageFingerprintMaxRunes = 100
 
 const conversationStartMaxRunes = 200
 
-// conversationStartSessionID identifies a conversation by its first system
-// instruction and first user message. Clients resend the whole history on
-// every turn, so both stay the same for the life of one conversation, while
-// the cc-full- fingerprint changes with every turn.
+// conversationStartSessionID identifies a conversation by its first user
+// message. Clients resend the whole history on every turn, so it stays the
+// same for the life of one conversation, while the cc-full- fingerprint
+// changes with every turn. System instructions are left out on purpose: a
+// decision's system_prompt plugin rewrites them before protection runs, so
+// they differ between decisions of one conversation.
 func conversationStartSessionID(ctx *RequestContext) string {
 	if ctx == nil || ctx.SemanticRequest == nil {
 		return ""
 	}
-	request := ctx.SemanticRequest
-	var system, user string
-	if len(request.Instructions) > 0 {
-		system = semanticText(request.Instructions[0].Content)
-	}
-	for _, msg := range request.Messages {
-		if msg.Role == llmprotocol.RoleSystem && system == "" {
-			system = semanticText(msg.Content)
+	for _, msg := range ctx.SemanticRequest.Messages {
+		if msg.Role != llmprotocol.RoleUser {
+			continue
 		}
-		if msg.Role == llmprotocol.RoleUser {
-			user = semanticText(msg.Content)
-			break
+		user := semanticText(msg.Content)
+		if user == "" {
+			return ""
 		}
+		hash := sha256.Sum256([]byte(firstRunes(user, conversationStartMaxRunes)))
+		return "conv-" + hex.EncodeToString(hash[:])[:16]
 	}
-	if user == "" {
-		return ""
-	}
-	hash := sha256.Sum256([]byte(firstRunes(system, conversationStartMaxRunes) + "\x00" + firstRunes(user, conversationStartMaxRunes)))
-	return "conv-" + hex.EncodeToString(hash[:])[:16]
+	return ""
 }
 
 func firstRunes(text string, limit int) string {
