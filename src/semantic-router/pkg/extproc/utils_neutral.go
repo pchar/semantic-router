@@ -85,6 +85,7 @@ func extractSemanticRequestSignals(request *llmprotocol.Request) *requestSignalS
 			result.Metadata[key] = value
 		}
 	}
+	addResponseFormatRoutingMetadata(result, request.OutputFormat.Kind)
 	for _, instruction := range request.Instructions {
 		text := semanticText(instruction.Content)
 		if instruction.Role == llmprotocol.RoleDeveloper {
@@ -232,4 +233,22 @@ func neutralInlineAudioDataURL(content llmprotocol.Content) string {
 		return content.URL
 	}
 	return ""
+}
+
+// responseFormatMetadataKey exposes the requested structured output format
+// (json_object or json_schema) to metadata signals, so a decision can route
+// strict-output requests without asking a classifier.
+const responseFormatMetadataKey = "response_format"
+
+func addResponseFormatRoutingMetadata(result *requestSignalSnapshot, kind llmprotocol.OutputFormatKind) {
+	if kind != llmprotocol.OutputJSONObject && kind != llmprotocol.OutputJSONSchema {
+		return
+	}
+	if result.Metadata == nil {
+		result.Metadata = map[string]string{}
+	}
+	if _, clientSet := result.Metadata[responseFormatMetadataKey]; clientSet {
+		return
+	}
+	result.Metadata[responseFormatMetadataKey] = string(kind)
 }
