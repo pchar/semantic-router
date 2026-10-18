@@ -3,6 +3,7 @@ package classification
 import (
 	"context"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -27,38 +28,66 @@ func (c *Classifier) decider() modelservice.Decider {
 	return modelservice.Default()
 }
 
+// decisionCall is one call's deployment and the earlier user turns its
+// questions read.
+type decisionCall struct {
+	deployment string
+	priorTurns int
+}
+
 // evaluateDecisionModelSignals asks every used decision question in one call
 // per deployment, with the request text as the state. Calls to different
-// deployments run in parallel. A failed or late call leaves its signals
-// unknown; it never fails the request.
+// deployments run in parallel. Questions that read earlier user turns share a
+// call only with questions that read as many. A failed or late call leaves its
+// signals unknown; it never fails the request.
 func (c *Classifier) evaluateDecisionModelSignals(
 	ctx context.Context,
 	results *SignalResults,
 	mu *sync.Mutex,
 	text string,
+	priorUserMessages []string,
 	usedSignals map[string]bool,
 ) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	start := time.Now()
-	byDeployment := make(map[string][]config.DecisionSignalRule)
-	var order []string
+	byCall := make(map[decisionCall][]config.DecisionSignalRule)
+	stateOf := make(map[decisionCall]string)
+	var order []decisionCall
 	for _, rule := range c.Config.DecisionRules {
 		if !signalRuleUsed(usedSignals, config.SignalTypeDecision, rule.Name) {
 			continue
 		}
-		if _, seen := byDeployment[rule.Deployment]; !seen {
-			order = append(order, rule.Deployment)
+		call := decisionCall{rule.Deployment, min(rule.PriorUserTurns, len(priorUserMessages))}
+		if _, seen := byCall[call]; !seen {
+			order = append(order, call)
+			stateOf[call] = withPriorUserTurns(text, priorUserMessages, call.priorTurns)
 		}
-		byDeployment[rule.Deployment] = append(byDeployment[rule.Deployment], rule)
+		byCall[call] = append(byCall[call], rule)
 	}
 	modelservice.Fan(ctx, len(order), func(i int) {
-		c.evaluateDecisionDeployment(ctx, results, mu, text, order[i], byDeployment[order[i]])
+		c.evaluateDecisionDeployment(ctx, results, mu, stateOf[order[i]], order[i].deployment, byCall[order[i]])
 	})
 	mu.Lock()
 	results.Metrics.Decision.ExecutionTimeMs = float64(time.Since(start).Microseconds()) / 1000.0
 	mu.Unlock()
+}
+
+// withPriorUserTurns is state after the last turns of prior, oldest first,
+// one blank line apart. The earlier turns share decisionSignalUnitLimit runes,
+// the latest turn first and each cut to its first runes, so however many turns
+// a question reads they add the same bounded context to the current turn.
+func withPriorUserTurns(state string, prior []string, turns int) string {
+	parts := []string{state}
+	room := decisionSignalUnitLimit
+	for index := len(prior) - 1; index >= len(prior)-turns && room > 0; index-- {
+		runes := []rune(prior[index])
+		runes = runes[:min(len(runes), room)]
+		room -= len(runes)
+		parts = append([]string{string(runes)}, parts...)
+	}
+	return strings.Join(parts, "\n\n")
 }
 
 func (c *Classifier) evaluateDecisionDeployment(
