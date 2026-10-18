@@ -78,8 +78,8 @@ type RouterLearningProtectionConfig struct {
 type RouterLearningIdentityConfig struct {
 	Headers RouterLearningIdentityHeadersConfig `yaml:"headers,omitempty"`
 	// Fallback derives a session identity when the session header is absent.
-	// "conversation_start" hashes the first system and first user message,
-	// which stay the same on every turn of one conversation.
+	// "conversation_start" hashes the first user message, which stays the
+	// same on every turn of one conversation.
 	Fallback string `yaml:"fallback,omitempty" jsonschema:"enum=conversation_start"`
 }
 
