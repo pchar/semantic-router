@@ -114,6 +114,7 @@ func (req IntentRequest) resolveSignalInput() (intentSignalInput, error) {
 		inputModality := input.requestFacts.InputModality
 		input.requestFacts = requestFactsForIntent(
 			req.Metadata,
+			req.ResponseFormat,
 			contextEstimate,
 		)
 		input.requestFacts.InputModality = inputModality
@@ -150,7 +151,7 @@ func (req IntentRequest) resolveSignalInput() (intentSignalInput, error) {
 			ToolChoiceNone:      toolChoiceFacts.None,
 			LastMessageRole:     "user",
 		},
-		requestFacts: requestFactsForIntent(req.Metadata, contextEstimate),
+		requestFacts: requestFactsForIntent(req.Metadata, req.ResponseFormat, contextEstimate),
 	}
 	if text != "" {
 		fallbackInput.requestFacts.InputModality.TextContentCount = 1
@@ -168,10 +169,11 @@ func fallbackText(text string, enabled bool) string {
 
 func requestFactsForIntent(
 	metadata map[string]string,
+	responseFormat json.RawMessage,
 	estimate classification.RequestContextEstimate,
 ) classification.RequestFacts {
 	return classification.RequestFacts{
-		Metadata:               cloneIntentMetadata(metadata),
+		Metadata:               withIntentResponseFormat(cloneIntentMetadata(metadata), responseFormat),
 		ContextTokenFloor:      estimate.TokenFloor,
 		ContextTextBytes:       estimate.TextBytes,
 		ContextEquivalentBytes: estimate.EquivalentBytes,
@@ -601,4 +603,29 @@ func bytesTrimSpace(raw []byte) []byte {
 		end--
 	}
 	return raw[start:end]
+}
+
+// intentResponseFormatMetadataKey mirrors the live ExtProc path: a request
+// asking for structured output exposes response_format=<type> to metadata
+// signals, so routing preview matches live routing.
+const intentResponseFormatMetadataKey = "response_format"
+
+func withIntentResponseFormat(metadata map[string]string, raw json.RawMessage) map[string]string {
+	var format struct {
+		Type string `json:"type"`
+	}
+	if len(raw) == 0 || json.Unmarshal(raw, &format) != nil {
+		return metadata
+	}
+	if format.Type != "json_object" && format.Type != "json_schema" {
+		return metadata
+	}
+	if _, clientSet := metadata[intentResponseFormatMetadataKey]; clientSet {
+		return metadata
+	}
+	if metadata == nil {
+		metadata = map[string]string{}
+	}
+	metadata[intentResponseFormatMetadataKey] = format.Type
+	return metadata
 }
