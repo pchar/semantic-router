@@ -65,7 +65,10 @@ func (c *Classifier) evaluateDecisionModelSignals(
 		call := decisionCall{c.Config.DecisionQuestionDeployment(rule), min(rule.PriorUserTurns, len(priorUserMessages))}
 		if _, seen := byCall[call]; !seen {
 			order = append(order, call)
-			stateOf[call] = withPriorUserTurns(wholeText, priorUserMessages, call.priorTurns)
+			// Fork: send the bounded sample, not the whole request. Our decision
+			// model is remote (d3-flash on thor) and its latency grows with input
+			// length; whole agent prompts overran the call timeout (0e8db79).
+			stateOf[call] = withPriorUserTurns(text, priorUserMessages, call.priorTurns)
 		}
 		byCall[call] = append(byCall[call], rule)
 	}
@@ -83,7 +86,7 @@ func (c *Classifier) evaluateDecisionModelSignals(
 // a question reads they add the same bounded context to the current turn.
 func withPriorUserTurns(state string, prior []string, turns int) string {
 	parts := []string{state}
-	room := semanticSignalUnitLimit
+	room := decisionSignalUnitLimit
 	for index := len(prior) - 1; index >= len(prior)-turns && room > 0; index-- {
 		runes := []rune(prior[index])
 		runes = runes[:min(len(runes), room)]

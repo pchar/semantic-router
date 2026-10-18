@@ -204,8 +204,9 @@ func TestADecisionQuestionWithoutDeploymentJoinsTheDecisionModelsCall(t *testing
 	used := map[string]bool{"decision:tools": true, "decision:hard": true}
 	classifier.evaluateDecisionModelSignals(context.Background(), newSignalResults(), &sync.Mutex{}, "short", "the whole text", nil, used)
 
-	if decider.states[config.DefaultDecisionDeployment] != "the whole text" || decider.states["kai"] != "the whole text" {
-		t.Fatalf("every decision question reads the same authored input: %v", decider.states)
+	// Fork: every call reads the bounded sample, never the whole request.
+	if decider.states[config.DefaultDecisionDeployment] != "short" || decider.states["kai"] != "short" {
+		t.Fatalf("every decision question reads the same bounded sample: %v", decider.states)
 	}
 	if decider.deadlines[config.DefaultDecisionDeployment] || !decider.deadlines["kai"] {
 		t.Fatalf("only a declared deployment's call takes the default timeout: %v", decider.deadlines)
@@ -238,7 +239,7 @@ func TestDecisionQuestionsReadTheirPriorUserTurns(t *testing.T) {
 	classifier := &Classifier{Config: cfg}
 	classifier.SetDecisionDecider(decider)
 	used := map[string]bool{"decision:alone": true, "decision:one": true, "decision:many": true}
-	latest := strings.Repeat("ü", semanticSignalUnitLimit-10)
+	latest := strings.Repeat("ü", decisionSignalUnitLimit-10)
 	prior := []string{"Write a poem about rain.", latest}
 
 	classifier.evaluateDecisionModelSignals(context.Background(), newSignalResults(), &sync.Mutex{}, "Now make it shorter.", "Now make it shorter.", prior, used)
