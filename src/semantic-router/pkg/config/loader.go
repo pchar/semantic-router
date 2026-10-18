@@ -537,7 +537,7 @@ func rejectUnsupportedProtectionLearningFields(prefix string, raw map[string]int
 	}
 	if identity, ok := raw["identity"]; ok {
 		identityMap := nestedStringMap(identity)
-		if err := rejectUnknownMapFields(prefix+".identity", identityMap, []string{"headers"}); err != nil {
+		if err := rejectUnknownMapFields(prefix+".identity", identityMap, []string{"headers", "fallback"}); err != nil {
 			return err
 		}
 		if err := rejectUnknownMapFields(

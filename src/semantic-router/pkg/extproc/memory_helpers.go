@@ -82,6 +82,45 @@ func deriveSessionIDFromSemanticMessages(messages []llmprotocol.Message, userID 
 
 const sessionMessageFingerprintMaxRunes = 100
 
+const conversationStartMaxRunes = 200
+
+// conversationStartSessionID identifies a conversation by its first system
+// instruction and first user message. Clients resend the whole history on
+// every turn, so both stay the same for the life of one conversation, while
+// the cc-full- fingerprint changes with every turn.
+func conversationStartSessionID(ctx *RequestContext) string {
+	if ctx == nil || ctx.SemanticRequest == nil {
+		return ""
+	}
+	request := ctx.SemanticRequest
+	var system, user string
+	if len(request.Instructions) > 0 {
+		system = semanticText(request.Instructions[0].Content)
+	}
+	for _, msg := range request.Messages {
+		if msg.Role == llmprotocol.RoleSystem && system == "" {
+			system = semanticText(msg.Content)
+		}
+		if msg.Role == llmprotocol.RoleUser {
+			user = semanticText(msg.Content)
+			break
+		}
+	}
+	if user == "" {
+		return ""
+	}
+	hash := sha256.Sum256([]byte(firstRunes(system, conversationStartMaxRunes) + "\x00" + firstRunes(user, conversationStartMaxRunes)))
+	return "conv-" + hex.EncodeToString(hash[:])[:16]
+}
+
+func firstRunes(text string, limit int) string {
+	runes := []rune(text)
+	if len(runes) > limit {
+		runes = runes[:limit]
+	}
+	return string(runes)
+}
+
 // deriveSessionIDFromMessagesStructure builds a session ID from the full message
 // list (roles + truncated content). Used when no stable user ID is available.
 // Prefix "cc-full-" distinguishes IDs from deriveSessionIDFromMessages (cc-).

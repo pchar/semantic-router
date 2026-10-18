@@ -77,7 +77,15 @@ type RouterLearningProtectionConfig struct {
 // identity. The runtime currently uses the session and conversation keys.
 type RouterLearningIdentityConfig struct {
 	Headers RouterLearningIdentityHeadersConfig `yaml:"headers,omitempty"`
+	// Fallback derives a session identity when the session header is absent.
+	// "conversation_start" hashes the first system and first user message,
+	// which stay the same on every turn of one conversation.
+	Fallback string `yaml:"fallback,omitempty" jsonschema:"enum=conversation_start"`
 }
+
+// RouterLearningIdentityFallbackConversationStart derives the session from
+// the start of the conversation when no session header is sent.
+const RouterLearningIdentityFallbackConversationStart = "conversation_start"
 
 // RouterLearningIdentityHeadersConfig is intentionally typed. The public
 // protection identity shape supports only the headers used by the protection

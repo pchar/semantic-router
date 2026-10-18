@@ -6050,6 +6050,12 @@
       "properties": {
         "headers": {
           "$ref": "#/$defs/RouterLearningIdentityHeadersConfig"
+        },
+        "fallback": {
+          "type": "string",
+          "enum": [
+            "conversation_start"
+          ]
         }
       },
       "additionalProperties": false,

@@ -538,6 +538,9 @@ func (r *OpenAIRouter) protectionIdentity(
 	conversationHeader := cfg.HeaderName("conversation")
 	sessionID := strings.TrimSpace(headerValueCI(ctx, sessionHeader))
 	conversationID := strings.TrimSpace(headerValueCI(ctx, conversationHeader))
+	if sessionID == "" && cfg.Identity.Fallback == config.RouterLearningIdentityFallbackConversationStart {
+		sessionID = conversationStartSessionID(ctx)
+	}
 	if sessionID == "" {
 		return routerLearningIdentity{}, false
 	}
